@@ -85,7 +85,7 @@ def main():
                 if "SUCCESS" in result:
                     number = result.split('|')[1]
                     self.result_signal.emit(
-                        '{"status": "SUCCESS", "message": "Lấy được + ' + f'{number}' + ' Group!"}')
+                        '{"status": "SUCCESS", "message": "Lấy được ' + f'{number}' + ' Group!"}')
                 else:
                     self.result_signal.emit(
                         '{"status": "ERROR", "message": "Lỗi không xác định"}')
@@ -228,12 +228,11 @@ def main():
                 result_dict = json.loads(result)
                 status = result_dict.get("status")
                 message = result_dict.get("message")
-
                 if status == "ERROR":
                     QMessageBox.critical(self, "Lỗi", message)
                 else:
                     QMessageBox.information(
-                        self, "Thành công", "Hoạt động đã hoàn tất thành công")
+                        self, "Thành công", message)
             except json.JSONDecodeError:
                 QMessageBox.critical(
                     self, "Lỗi", "Dữ liệu trả về không hợp lệ")

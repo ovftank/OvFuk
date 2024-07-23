@@ -1,16 +1,22 @@
 import base64
+import json
+import re
 import sys
 import webbrowser
 
-from PyQt5.QtCore import (QBuffer, QByteArray, QIODevice, Qt, QThread,
-                          pyqtSignal)
+from PyQt5.QtCore import QBuffer, QIODevice, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFontDatabase, QIcon, QImage, QPixmap
 from PyQt5.QtMultimedia import QSound
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
-                             QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                             QPushButton, QTextEdit, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QTextEdit, QVBoxLayout, QWidget)
 
 from lib import AutoChrome, gen_text
+
+
+def validate_proxy(proxy):
+    pattern = r'^[^:]+:\d+$'
+    return re.match(pattern, proxy) is not None
 
 
 def base64_to_pixmap(base64_str):
@@ -59,12 +65,33 @@ def main():
             self.content = content
 
         def run(self):
-            chrome = AutoChrome(
-                self.load_image,
-                self.load_css,
-                self.headless,
-                self.proxy
-            )
+            if self.username == '' or self.password == '' or self.key_2fa == '':
+                self.result_signal.emit(
+                    '{"status": "ERROR", "message": "Chưa điền đủ thông tin đăng nhập"}')
+                return
+            elif self.api_gemini == '':
+                self.result_signal.emit(
+                    '{"status": "ERROR", "message": "Vui lòng nhập API Gemini"}')
+                return
+            elif self.content == '':
+                self.result_signal.emit(
+                    '{"status": "ERROR", "message": "Chưa nhập nội dung bài viết"}')
+                return
+            if self.proxy != '' and not validate_proxy(self.proxy):
+                self.result_signal.emit(
+                    '{"status": "ERROR", "message": "Proxy không hợp lệ"}')
+                return
+            try:
+                chrome = AutoChrome(
+                    self.load_image,
+                    self.load_css,
+                    self.headless,
+                    self.proxy
+                )
+            except Exception as e:
+                self.result_signal.emit(
+                    '{"status": "ERROR", "message": "' + str(e) + '"}')
+                return
             status = chrome.login(self.username, self.password, self.key_2fa)
             if status != 'SUCCESS':
                 self.result_signal.emit(
@@ -215,6 +242,21 @@ def main():
             self.thread.result_signal.connect(self.handle_result)
             self.thread.start()
 
+        def handle_result(self, result):
+            try:
+                result_dict = json.loads(result)
+                status = result_dict.get("status")
+                message = result_dict.get("message")
+
+                if status == "ERROR":
+                    QMessageBox.critical(self, "Lỗi", message)
+                else:
+                    QMessageBox.information(
+                        self, "Thành công", "Hoạt động đã hoàn tất thành công")
+            except json.JSONDecodeError:
+                QMessageBox.critical(
+                    self, "Lỗi", "Dữ liệu trả về không hợp lệ")
+
         def select_images(self):
             options = QFileDialog.Options()
             options |= QFileDialog.ReadOnly
@@ -236,9 +278,6 @@ def main():
                     QMessageBox.about(
                         self, "Thông báo", f"Đã chọn {len(self.image_paths)} hình ảnh.")
             print(self.image_paths)
-
-        def handle_result(self, result):
-            QMessageBox.information(self, 'Chạy hoàn tất', result)
 
     window = OvFuk()
     sys.exit(app.exec_())

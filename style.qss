@@ -1,0 +1,76 @@
+/* style.qss */
+
+QWidget {
+    background-color: #f9f9f9;
+    font-family: 'Comic Sans MS';
+}
+
+/* Label styling */
+QLabel {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* Line edit styling */
+QLineEdit,
+QTextEdit {
+    border: 2px solid #dcdcdc;
+    border-radius: 5px;
+    padding: 5px;
+    font-size: 14px;
+    background-color: #f9f9f9;
+}
+
+/* Push button styling */
+QPushButton {
+    background-color: #ff85a2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #ff6f91;
+}
+
+/* Checkbox styling */
+QCheckBox {
+    font-weight: 500;
+    font-size: 14px;
+    color: #555;
+}
+
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #dcdcdc;
+    border-radius: 5px;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #ff85a2;
+    border: 2px solid #ff85a2;
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: #f9f9f9;
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #ff6f91;
+}
+
+QCheckBox::indicator:unchecked:hover {
+    background-color: #e0e0e0;
+}
+
+/* Scrollbar styling */
+QScrollBar:vertical,
+QScrollBar:horizontal {
+    width: 2px;
+    height: 2px;
+}

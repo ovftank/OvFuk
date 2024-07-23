@@ -1,20 +1,23 @@
 import re
 import time
-from turtle import pos
 
 import google.generativeai as genai
 import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 
 
 def get_code_2fa(key_2fa: str):
+    """
+    Lấy mã xác thực hai yếu tố (2FA) từ key 2fa
+
+    Args:
+        key_2fa (str): Truyền vào Key 2FA
+
+    Returns:
+        str: Mã xác thực 2FA.
+    """
     url = f"https://2fa.live/tok/{key_2fa}"
     response = requests.get(url)
     data = response.json()
@@ -23,7 +26,19 @@ def get_code_2fa(key_2fa: str):
 
 
 class AutoChrome:
+
     def __init__(self, enable_images: bool = False, enable_css: bool = True, headless: bool = False, proxy: str = ''):
+        """
+        ---
+        Khởi tạo đối tượng AutoChrome.
+        ---
+        ### Các tham số:
+            - enable_images (bool): Bật load hình ảnh(tắt sẽ load nhanh hơn)
+            - enable_css (bool): Bật Load CSS
+            - headless (bool): Chạy ẩn Chrome(Nhẹ hơn, có thể sẽ bị lỗi)
+            - proxy (str): Proxy dạng IP:PORT
+        """
+
         self.options = Options()
         self.options.add_argument("--disable-extensions")
         self.options.add_argument("--disable-gpu")
@@ -58,14 +73,27 @@ class AutoChrome:
         if proxy:
             self.options.add_argument(f"--proxy-server={proxy}")
         self.driver = webdriver.Chrome(options=self.options)
-
-    def login(self, username: str, password: str, key_2fa: str):
+        self.driver.get('https://mbasic.facebook.com')
         cookie = {
             'name': 'locale',
             'value': 'en_GB'
         }
-        self.driver.get('https://mbasic.facebook.com')
         self.driver.add_cookie(cookie)
+
+    def login(self, username: str, password: str, key_2fa: str):
+        """
+        ---
+        Đăng nhập vào Facebook
+        ---
+        ### Các tham số:
+            - username (str): Tên người Facebook.
+            - password (str): Mật khẩu Facebook
+            - key_2fa (str): KEY 2FA để lấy mã xác thực.
+        ---
+        ### Trả về:
+            - str: "SUCCESS" nếu đăng nhập thành công, "FAILED" nếu sai pass hoặc sai 2FA
+        """
+        self.driver.get('https://mbasic.facebook.com')
         username_input = self.driver.find_element(By.ID, 'm_login_email')
         username_input.clear()
         username_input.send_keys(username)
@@ -101,8 +129,19 @@ class AutoChrome:
                     submit_button.click()
                     if 'https://mbasic.facebook.com/login/checkpoint/' not in self.driver.current_url:
                         break
+        return "SUCCESS"
 
     def search_group(self, keyword: str):
+        """
+        ---
+        Tìm kiếm nhóm trên Facebook
+        ---
+        ### Các tham số:
+            - keyword (str): Từ khóa tìm kiếm nhóm.
+        ---
+        ### Trả về:
+            - str: "SUCCESS" nếu tìm kiếm thành công.
+        """
         if " " in keyword:
             keyword = keyword.replace(" ", "+")
         self.driver.get(
@@ -115,8 +154,18 @@ class AutoChrome:
                 By.TAG_NAME, 'span')
             see_more_pager_span.click()
             self.get_link(self.driver)
+        return "SUCCESS"
 
     def get_link(self, driver):
+        """
+        ---
+        Xuất ID Group
+        ---
+        ### Tham số:
+            - driver (webdriver.Chrome): Đối tượng trình duyệt Chrome đang hoạt động.
+        Returns:
+            - str: "SUCCESS" nếu lấy liên kết thành công.
+        """
         pattern = r"https://mbasic\.facebook\.com/groups/(\d+)"
         result_div = driver.find_element(By.ID, 'BrowseResultsContainer')
         tables = result_div.find_elements(By.TAG_NAME, 'table')
@@ -128,22 +177,34 @@ class AutoChrome:
                 group_id = match.group(1)
                 with open('group_id.txt', 'a') as f:
                     f.write(group_id + '\n')
-                print(group_id)
+        return "SUCCESS"
 
     def post_status(self, message: str, id: str, image_paths: list = []):
+        """
+        ---
+        Spam bài lên group kèm và hình ảnh (nếu có).
+        ---
+        ### Tham số:
+            - message (str): Nội dung bài viết.
+            - id (str): ID của nhóm để đăng bài.
+            - image_paths (list): Danh sách đường dẫn đến hình ảnh.
+
+        ### Trả về:
+            - str: "SUCCESS" nếu đăng bài viết thành công, "MAX_IMAGES" nếu số lượng hình ảnh vượt quá giới hạn.
+        """
         id_group = id.replace('\n', '').replace('/\n', '')
         url = f'https://mbasic.facebook.com/groups/{id_group}'
         self.driver.get(url)
         view_more = self.driver.find_element(By.NAME, 'view_overview')
         view_more.click()
-        image_paths = ['C:\\Users\\Admin\\Documents\\OvFuk\\image.jpg']
         if image_paths:
             image_button = self.driver.find_element(By.NAME, 'view_photo')
             image_button.click()
             for index, image_path in enumerate(image_paths):
+                if len(image_paths) > 3:
+                    return "MAX_IMAGES"
                 image_input = self.driver.find_element(
-                    By.NAME, 'file1')
-                print(index)
+                    By.NAME, f'file{index}')
                 image_input.send_keys(image_path)
                 time.sleep(1)
                 send_button = self.driver.find_element(
@@ -153,9 +214,21 @@ class AutoChrome:
         text_area.send_keys(message)
         post_button = self.driver.find_element(By.NAME, 'view_post')
         post_button.click()
+        return "SUCCESS"
 
 
 def gen_text(api, content):
+    """
+    ---
+    Mix content
+    ---
+    ### Tham số:
+        - api (str): API key Gemini [tại đây](https://aistudio.google.com/app/apikey?hl=vi)
+        - content (str): Content cầnt thay đổi
+    ---
+    ### Trả về:
+        - str: Content mới
+    """
     genai.configure(api_key=api)
     generation_config = {
         "temperature": 2,
@@ -167,7 +240,7 @@ def gen_text(api, content):
 
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash",
-        generation_config=generation_config,
+        generation_config=generation_config,  # type: ignore
     )
 
     chat_session = model.start_chat(
@@ -175,7 +248,7 @@ def gen_text(api, content):
             {
                 "role": "user",
                 "parts": [
-                    "# Character\nBạn là một nhà tuyển dụng kiêm nhà sáng tạo nội dung chuyên nghiệp. Bạn giỏi viết các bài đăng tuyển dụng hấp dẫn và tuân thủ ngữ điệu, ngữ pháp và các quy chuẩn trên Facebook.\n\n## Skills\n### Skill 1: Tạo bài đăng tuyển dụng hấp dẫn\n- Hiểu yêu cầu công việc từ nhà tuyển dụng.\n- Tạo nội dung thu hút ứng viên có các kỹ năng phù hợp.\n- Đảm bảo ngữ điệu và ngữ pháp đúng chuẩn.\n- Nội dung bài đăng giới hạn trong 100 kí tự\n\n### Skill 2: Tối ưu hóa nội dung cho Facebook\n- Áp dụng chiến lược nội dung và hình ảnh phù hợp với đối tượng người đọc trên Facebook.\n- Sử dụng các hashtag, biểu tượng cảm xúc và lời kêu gọi hành động hiệu quả.\n\n### Skill 3: Luôn tạo bài đăng ngắn gọn\n- Thông tin cần bao gồm\n- Địa chỉ\n- Mức lương\n- Thông tin liên hệ(Zalo/Số điện thoại)\n\n## Constraints\n- Các bài đăng chỉ được tạo bằng tiếng Việt.\n- Không chứa nội dung gây tranh cãi hay phản cảm.\n- No yapping\n- Ngắn gọn, luôn áp dụng theo bài mẫu\n\n\n# Bài mẫu\nLàm nhà hàng lương 7 đến 8 triệu bao ăn ở tại Hà Nội . Liên hệ trực tiếp vs chủ . Sdt:0388368629..! Zalo :0388368629\n",
+                    "# Character\nBạn là một nhà tuyển dụng kiêm nhà sáng tạo nội dung chuyên nghiệp. Bạn giỏi viết các bài đăng tuyển dụng hấp dẫn và tuân thủ ngữ điệu, ngữ pháp và các quy chuẩn trên Facebook.\n\n## Skills\n### Skill 1: Tạo bài đăng tuyển dụng hấp dẫn\n- Hiểu yêu cầu công việc từ nhà tuyển dụng.\n- Tạo nội dung thu hút ứng viên có các kỹ năng phù hợp.\n- Đảm bảo ngữ điệu và ngữ pháp đúng chuẩn.\n- Nội dung bài đăng giới hạn trong 100 kí tự\n\n### Skill 2: Tối ưu hóa nội dung cho Facebook\n- Áp dụng chiến lược nội dung và hình ảnh phù hợp với đối tượng người đọc trên Facebook.\n- Sử dụng các hashtag, biểu tượng cảm xúc và lời kêu gọi hành động hiệu quả.\n\n### Skill 3: Luôn tạo bài đăng ngắn gọn\n- Thông tin cần bao gồm\n- Địa chỉ\n- Mức lương\n- Thông tin liên hệ(Zalo/Số điện thoại)\n\n## Constraints\n- Các bài đăng chỉ được tạo bằng tiếng Việt.\n- Không chứa nội dung gây tranh cãi hay phản cảm.\n- No yapping\n- Ngắn gọn, luôn áp dụng theo bài mẫu sau\n\n\n# Bài mẫu\nLàm nhà hàng lương 7 đến 8 triệu bao ăn ở tại Hà Nội . Liên hệ trực tiếp vs chủ . Sdt:0123456789..! Zalo :0123456789\n",
                 ],
             },
             {
@@ -235,13 +308,13 @@ def gen_text(api, content):
             {
                 "role": "user",
                 "parts": [
-                    "Làm nhà hàng lương 7 đến 8 triệu bao ăn ở tại Hà Nội . Liên hệ trực tiếp vs chủ . Sdt:0388368629..! Zalo :0388368629\n",
+                    "Làm nhà hàng lương 7 đến 8 triệu bao ăn ở tại Hà Nội . Liên hệ trực tiếp vs chủ . Sdt:0123456789..! Zalo :0123456789\n",
                 ],
             },
             {
                 "role": "model",
                 "parts": [
-                    "💪  Tuyển gấp nhân viên nhà hàng tại Hà Nội! 💪\n\n💸 Lương 7-8 triệu/tháng, bao ăn ở\n📞  Liên hệ trực tiếp với chủ: 0388368629 (Zalo/SĐT)\n#tuyendung #nhanvien #nhahang #hanoi \n",
+                    "💪  Tuyển gấp nhân viên nhà hàng tại Hà Nội! 💪\n\n💸 Lương 7-8 triệu/tháng, bao ăn ở\n📞  Liên hệ trực tiếp với chủ: 0123456789 (Zalo/SĐT)\n#tuyendung #nhanvien #nhahang #hanoi \n",
                 ],
             },
         ]
@@ -250,9 +323,9 @@ def gen_text(api, content):
     return response.text
 
 
+# Ví dụ sử dụng lớp AutoChrome:
 # chrome = AutoChrome()
-# chrome.login('100080375493485', 'sFuLBTIcV2',
-#              'XCKBODK3ZRMIGRO7E7IUQYXD5JXCZO33')
+# chrome.login('100080375493485', 'sFuLBTIcV2', 'XCKBODK3ZRMIGRO7E7IUQYXD5JXCZO33')
 # chrome.search_group('Con Meo')
 # with open('group_id.txt', 'r') as f:
 #     for line in f:

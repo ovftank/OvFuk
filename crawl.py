@@ -3,13 +3,14 @@ import json
 import re
 import sys
 import webbrowser
+from binascii import crc_hqx
 
 from PyQt5.QtCore import QBuffer, QIODevice, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFontDatabase, QIcon, QImage, QPixmap
 from PyQt5.QtMultimedia import QSound
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHBoxLayout,
                              QLabel, QLineEdit, QMessageBox, QPushButton,
-                             QTextEdit, QVBoxLayout, QWidget)
+                             QSpinBox, QVBoxLayout, QWidget)
 
 from lib import AutoChrome, gen_text
 
@@ -35,24 +36,10 @@ def main():
     font_db = QFontDatabase()
     font_db.addApplicationFont('fonts/VNF-Comic Sans.ttf')
 
-    class ClickableLabel(QLabel):
-        clicked = pyqtSignal()
-
-        def __init__(self, parent=None):
-            super().__init__(parent)
-            self.setCursor(Qt.PointingHandCursor)  # type: ignore
-            self.setToolTip('Click để lấy API')
-
-        def mousePressEvent(self, event):
-            if event.button() == Qt.LeftButton:  # type: ignore
-                self.clicked.emit()
-                webbrowser.open('https://aistudio.google.com/app/apikey?hl=vi')
-            super().mousePressEvent(event)
-
     class Worker(QThread):
         result_signal = pyqtSignal(str)
 
-        def __init__(self, username, password, key_2fa, proxy, load_image, load_css, headless, api_gemini, content):
+        def __init__(self, username, password, key_2fa, proxy, load_image, load_css, headless, keyword, page_number):
             super().__init__()
             self.username = username
             self.password = password
@@ -61,21 +48,17 @@ def main():
             self.load_image = load_image
             self.load_css = load_css
             self.headless = headless
-            self.api_gemini = api_gemini
-            self.content = content
+            self.keyword = keyword
+            self.page_number = page_number
 
         def run(self):
             if self.username == '' or self.password == '' or self.key_2fa == '':
                 self.result_signal.emit(
                     '{"status": "ERROR", "message": "Chưa điền đủ thông tin đăng nhập"}')
                 return
-            elif self.api_gemini == '':
+            elif self.keyword == '':
                 self.result_signal.emit(
-                    '{"status": "ERROR", "message": "Vui lòng nhập API Gemini"}')
-                return
-            elif self.content == '':
-                self.result_signal.emit(
-                    '{"status": "ERROR", "message": "Chưa nhập nội dung bài viết"}')
+                    '{"status": "ERROR", "message": "Vui lòng nhập từ khoá"}')
                 return
             if self.proxy != '' and not validate_proxy(self.proxy):
                 self.result_signal.emit(
@@ -97,14 +80,15 @@ def main():
                 self.result_signal.emit(
                     '{"status": "ERROR", "message": "Thông tin tài khoản không hợp lệ"}')
                 return
-            content = gen_text(self.api_gemini, self.content)
             try:
-                with open('group_id.txt', 'r') as f:
-                    for line in f:
-                        chrome.post_status(content, line)
-            except FileNotFoundError:
-                self.result_signal.emit(
-                    '{"status": "ERROR", "message": "Vui lòng lấy danh sách group trước!"}')
+                result = chrome.search_group(self.keyword, self.page_number)
+                if "SUCCESS" in result:
+                    number = result.split('|')[1]
+                    self.result_signal.emit(
+                        '{"status": "SUCCESS", "message": "Lấy được + ' + f'{number}' + ' Group!"}')
+                else:
+                    self.result_signal.emit(
+                        '{"status": "ERROR", "message": "Lỗi không xác định"}')
             except Exception as e:
                 self.result_signal.emit(
                     '{"status": "ERROR", "message": "' + str(e) + '"}')
@@ -181,17 +165,14 @@ def main():
             check_box_layout.addWidget(self.load_css)
             check_box_layout.addSpacing(5)
             check_box_layout.addWidget(self.hide_chrome)
-            self.api_key_label = ClickableLabel('🔒 API Gemini:')
-            self.api_key = QLineEdit(self)
-            self.api_key.setPlaceholderText(
-                'Click vào tiêu đề để lấy API')
-            self.content_label = QLabel("📝 Nội dung bài đăng: ")
-            self.images = QPushButton('🖼️ Chọn ảnh đính kèm', self)
-            self.images.clicked.connect(self.select_images)
-            self.image_paths = []
-            self.content = QTextEdit(self)
-            self.content.setAcceptRichText(False)
-
+            self.keyword_label = QLabel('🔒 Nhập từ khoá:')
+            self.keyword = QLineEdit(self)
+            self.keyword.setPlaceholderText(
+                'Nhập vào từ khoá cần tìm(VD: Nhà Hàng, Quán Hát,...)')
+            self.page_label = QLabel('📄 Số trang cần lấy:')
+            self.page_number = QSpinBox(self)
+            self.page_number.setMinimum(1)
+            self.page_number.setToolTip('Số lần ấn xem thêm')
             self.button_login = QPushButton('🚀 Chạy', self)
             self.button_login.clicked.connect(self.handle_login)
 
@@ -201,15 +182,14 @@ def main():
             config_layout.addSpacing(5)
             config_layout.addLayout(check_box_layout)
             config_layout.addSpacing(5)
-            config_layout.addWidget(self.api_key_label)
+            config_layout.addWidget(self.keyword_label)
             config_layout.addSpacing(5)
-            config_layout.addWidget(self.api_key)
+            config_layout.addWidget(self.keyword)
             config_layout.addSpacing(5)
-            config_layout.addWidget(self.content_label)
+            config_layout.addWidget(self.page_label)
             config_layout.addSpacing(5)
-            config_layout.addWidget(self.content)
+            config_layout.addWidget(self.page_number)
             config_layout.addSpacing(5)
-            config_layout.addWidget(self.images)
             main_layout = QVBoxLayout()
             main_layout.addItem(layout_1)
             main_layout.addItem(layout_2)
@@ -236,10 +216,10 @@ def main():
             load_image = self.load_image.isChecked()
             load_css = self.load_css.isChecked()
             hide_chrome = self.hide_chrome.isChecked()
-            api_gemini = self.api_key.text()
-            content = self.content.toPlainText()
+            keyword = self.keyword.text()
+            page_number = self.page_number.value()
             self.thread: Worker = Worker(
-                username, password, key_2fa, proxy, load_image, load_css, hide_chrome, api_gemini, content)
+                username, password, key_2fa, proxy, load_image, load_css, hide_chrome, keyword, page_number)
             self.thread.result_signal.connect(self.handle_result)
             self.thread.start()
 

@@ -131,13 +131,14 @@ class AutoChrome:
                         break
         return "SUCCESS"
 
-    def search_group(self, keyword: str):
+    def search_group(self, keyword: str, page_number: int):
         """
         ---
         Tìm kiếm nhóm trên Facebook
         ---
         ### Các tham số:
             - keyword (str): Từ khóa tìm kiếm nhóm.
+            - page_number (int): Số trang cần tìm kiếm.
         ---
         ### Trả về:
             - str: "SUCCESS" nếu tìm kiếm thành công.
@@ -147,14 +148,15 @@ class AutoChrome:
         self.driver.get(
             'https://mbasic.facebook.com/search/groups/?q=' + keyword)
         self.get_link(self.driver)
-        for _ in range(2):
+        for _ in range(page_number):
             see_more_pager_div = self.driver.find_element(
                 By.ID, 'see_more_pager')
             see_more_pager_span = see_more_pager_div.find_element(
                 By.TAG_NAME, 'span')
             see_more_pager_span.click()
             self.get_link(self.driver)
-        return "SUCCESS"
+        number = len(open('group_id.txt', 'r').readlines())
+        return f"SUCCESS|{number}"
 
     def get_link(self, driver):
         """

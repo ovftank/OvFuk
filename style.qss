@@ -2,7 +2,7 @@
 
 QWidget {
     background-color: #f9f9f9;
-    font-family: 'Comic Sans MS';
+    font-family: 'VNF-Comic Sans';
 }
 
 /* Label styling */
